@@ -68,14 +68,16 @@ To determines MF's parameters, we solve the following optimization problem.
 \end{equation}
 where
 $R$ is is the rating matrix that includes the feedback of the $m$th user on $n$th item at the ($m$, $n$) entry $r_{m n}$. The matrix factorization is technique to find two dense matrices $U \in \bbr^{d \times M}$ and $V \in \bbr^{d \times N}$ such that $r_{m,n} = \bu_m^T\bv_n$, where $\bu_m \in \bbr^d$ and $\bv_n \in \bbr^d$ are respectively the $m$th column of $U$ and the $n$th column of $V$.  In order to show the connection between MF and FM and reuse the former derivation, we apply formulations for \eqref{eq:MF} and have
-
 \begin{equation}
-    %\min_{U, V} \quad f(U, V)
-    \min_{U,V}  \quad \frac{1}{2}\sum_{i}^l  \Bigl(y_i - (U \bw_i)^T (V \bh_i)\Bigr)^2+
+\min_{U, V} \quad f(U, V)\label{eq:min_reMF}
+\end{equation}
+where 
+\begin{equation}
+    f(U, V) = \frac{1}{2}\sum_{i}^l  \Bigl(y_i - (U \bw_i)^T (V \bh_i)\Bigr)^2+
     \frac{\lambda}{2} (\|U\|^2_F +\|V\|^2_F	)
     \label{eq:reMF}
 \end{equation}
-where $l$ is the number of nonzero entries in $R$. We can consider $(y_i, \bw_i, \bh_i)$ as $i$th instance of a regression problem which totally has $l$ instances in the training set.
+and $l$ is the number of nonzero entries in $R$. We can consider $(y_i, \bw_i, \bh_i)$ as $i$th instance of a regression problem which totally has $l$ instances in the training set.
 $y_i=r_{m, n}$ is the value of the corresponding rating from $R$. $\bh_i \in \bbr^N $ and $\bw_i \in \bbr^M$ are the feature vectors. For matrix factorization problem, $\bw_i$ and $\bh_i$  include a single user id and a single item id and are encoded by one-hot, respectively.  
 Note that \eqref{eq:reMF} is a variant FM that \citet{MB16a} proposed. 
 In comparison with standard FM \citep{SR10c}, 
@@ -99,37 +101,39 @@ where $b_i = (\bp_i^T\bq_i-y_i)$.
 \bj_i = (\bw_i\otimes \bq_i, \bh_i\otimes \bp_i)
 \end{equation}
 is the Jacobian of $z_i$ and $(\cdot,\cdot)$ is the vertical concatenation of two matrices. 
-\end{comment}  
-
-The gradient of \eqref{eq:reMF} is
-\begin{align}
-    \nabla f(U, V) &= \lambda \vectorize(U, V) + \frac{1}{2}\sum_{i=1}^{l} \pdv{\xi_i}{z_i} \bj_i \nonumber\\
-    &= \lambda \vectorize(U, V) + \sum_{i=1}^{l}b_i \bj_i
-    \label{eq:Grad}
-\end{align}
-where the loss function $\xi_i = \Bigl(\bp_i^T\bq_i-y_i\Bigr)^2$, $z_i = \bp_i^T\bq_i$, $b_i = (\bp_i^T\bq_i-y_i)$, $\bp_i = U\bw_i$, $\bq_i = V\bh_i$, and
-\begin {align}
-%\bj_i = (\bw_i\otimes \bq_i, \bh_i\otimes \bp_i)
-\bj_i &= \begin{bmatrix} \frac{\partial z_i}{\partial \vectorize(U)} \\ \frac{\partial z_i}{\partial \vectorize(V)} \end{bmatrix}_{(Md+Nd)\times 1}\nonumber \\
-&= \begin{bmatrix} \bw_i\otimes \bq_i \\ \bh_i\otimes \bp_i \end{bmatrix}_{(Md+Nd)\times 1}
-\label{eq:Jacob}
-\end{align}
-is the Jacobian of $z_i$.
-
-We investigate how to compute the gradient of \eqref{eq:reMF} and begin with the following properties of  the Kronecker product among matrices $A$, $B$ and $X$:
+\end{comment} 
+To compute the gradient of \eqref{eq:reMF}, we begin with the following properties of  the Kronecker product among matrices $A$, $B$ and $X$:
 \begin{equation}
 (B^T \otimes A)\vectorize(X) = \vectorize(AXB)
 \label{eq:kronecker_vec}
 \end{equation}
 \begin{equation}
 (A \otimes B)^T = A^T \otimes B^T
-\label{eq:kronecker}
+\label{eq:kronecker_T}.
 \end{equation}
-%By some reformulations 
-Then, according to the properties, we have
+Moreover, we have the derivative of predict value by the Kronecker properties as follows:
 \begin{align}
-\frac{\partial f}{\partial \vectorize(U)} &=\lambda \vectorize(U) +  \sum_{i=1}^l b_i (\bw_i\otimes\bq_i)\nonumber \\
-&=\lambda \vectorize(U) +  \sum_{i=1}^l \vectorize\left(\bq_i b_i \bw_i^T) \right) \nonumber\\
+(U \bw_i)^T (V \bh_i) &= (\bh_i^T \otimes (U \bw_i)^T)\vectorize(V)\label{eq:predict_UwVh_T} \\
+&= (\bh_i \otimes (U \bw_i))^T\vectorize(V)
+\label{eq:predict_UwVh}
+\end{align}
+where \eqref{eq:predict_UwVh_T} and \eqref{eq:predict_UwVh} are from \eqref{eq:kronecker_vec} and \eqref{eq:kronecker_T}, respectively.
+The predict value also can be derived as follows:
+\begin{align}
+(U \bw_i)^T (V \bh_i) &= (V \bh_i)^T (U \bw_i) \nonumber \\
+&= (\bw_i^T \otimes (V \bh_i)^T)\vectorize(U)\nonumber \\
+&= (\bw_i \otimes (V \bh_i))^T \vectorize(U)
+\label{eq:predict_VhUw}.
+\end{align}
+Then, we define $\bp_i = U\bw_i$, $\bq_i = V\bh_i$, $z_i = \bp_i^T\bq_i$, $b_i = z_i-y_i = \bp_i^T\bq_i-y_i$, and the loss function $\xi_i = b_i^2 = \Bigl(\bp_i^T\bq_i-y_i\Bigr)^2$.
+According to the derivation and the Kronecker properties, we have
+\begin{align}
+\frac{\partial f}{\partial \vectorize(U)} 
+&= \lambda \vectorize(U) + \frac{1}{2}\sum_{i=1}^{l} \pdv{\xi_i}{z_i} \frac{\partial z_i}{\partial \vectorize(U)} \nonumber\\
+&= \lambda \vectorize(U) + \sum_{i=1}^{l}b_i \frac{\partial (\bw_i \otimes (V \bh_i))^T\vectorize(U)}{\partial \vectorize(U)}\nonumber \\
+&=\lambda \vectorize(U) +  \sum_{i=1}^l b_i (\bw_i\otimes\bq_i)\label{eq:GradU_K1} \\
+&=\lambda \vectorize(U) +  \sum_{i=1}^l \vectorize\left(\bq_i b_i \bw_i^T \right) \label{eq:GradU_K2}\\
+&=\lambda \vectorize(U) +  \vectorize\left( \sum_{i=1}^l \bq_i b_i \bw_i^T \right) \nonumber\\
 &=\lambda \vectorize(U) +  \vectorize \Bigl ( Q \bigl(\diag(\bsym{b}) W \bigr)  \Bigr)\label{eq:GradU},
 \end{align}
 \begin{comment}
@@ -142,36 +146,63 @@ Then, according to the properties, we have
     \end{align}
 %where $b_i = (\bp_i^T\bq_i-y_i)$, $\bp_i = U\bw_i$ and $\bq_i = V\bh_i$.
 \end{comment}
-where $\diag(\bsym{b})$ is a diagonal matrix in which the $i$th diagonal element is $b_i$. Similarly,
+where $\diag(\bsym{b})$ is a diagonal matrix in which the $i$th diagonal element is $b_i$, and for the second term in \eqref{eq:GradU_K1} and \eqref{eq:GradU_K2} we apply \eqref{eq:kronecker_vec}. Similarly,
 \begin{align}
-\frac{\partial f}{\partial \vectorize(V)} &=\lambda \vectorize(V) +  \sum_{i=1}^l b_i (\bh_i\otimes\bp_i)\nonumber \\
-&=\lambda \vectorize(V) +  \sum_{i=1}^l \vectorize\left(\bp_i b_i \bh_i^T) \right) \nonumber\\
-&=\lambda \vectorize(V) +  \vectorize \Bigl ( P \bigl(\diag(\bsym{b}) H \bigr)  \Bigr)\label{eq:GradV},
+\frac{\partial f}{\partial \vectorize(V)} 
+&= \lambda \vectorize(V) + \frac{1}{2}\sum_{i=1}^{l} \pdv{\xi_i}{z_i} \frac{\partial z_i}{\partial \vectorize(V)} \nonumber\\
+&= \lambda \vectorize(V) + \sum_{i=1}^{l}b_i \frac{\partial (\bh_i \otimes (U \bw_i))^T\vectorize(V)}{\partial \vectorize(V)}\nonumber \\
+&=\lambda \vectorize(V) +  \sum_{i=1}^l b_i (\bh_i\otimes\bp_i)\nonumber \\
+&=\lambda \vectorize(V) +  \sum_{i=1}^l \vectorize\left(\bp_i b_i \bh_i^T \right) \nonumber\\
+&=\lambda \vectorize(V) +  \vectorize\left(\sum_{i=1}^l \bp_i b_i \bh_i^T \right) \nonumber\\
+&=\lambda \vectorize(V) +  \vectorize \Bigl ( P \bigl(\diag(\bsym{b}) H \bigr)  \Bigr)\label{eq:GradV}.
 \end{align}
-%The Jacobian $\bj_i$ of $z_i$ is
-%To simplify subsequent notations, we define $\bp_i = U\bw_i$ and $\bq_i = V\bh_i$.
-%\begin {equation}
-%\bj_i = (\bw_i\otimes \bq_i, \bh_i\otimes \bp_i)
-%\end{equation}
-%is the Jacobian of $z_i$ ,
-%where $(\cdot,\cdot)$ is the vertical concatenation of two matrices, and $\diag(\bsym{b})$ is a diagonal matrix in which the $i$th diagonal element is $b_i$.
 Since $W$ and $H$ is highly sparse matrices, we need to calculate $\diag(\bsym{b})W$ and $\diag(\bsym{b})H$ first.
 Then, the main operation for gradient evaluation is a matrix-matrix product that costs $\bbO{2d\times l}$.
 \par
 
+The Jocobian of $z_i$ is
+\begin {align}
+%\bj_i = (\bw_i\otimes \bq_i, \bh_i\otimes \bp_i)
+\bj_i &= \begin{bmatrix} \frac{\partial z_i}{\partial \vectorize(U)} \\ \frac{\partial z_i}{\partial \vectorize(V)} \end{bmatrix}\nonumber \\
+&= \begin{bmatrix} \frac{\partial (\bw_i \otimes (V \bh_i))^T\vectorize(U)}{\partial \vectorize(U)} \\ \frac{\partial (\bh_i \otimes (U \bw_i))^T\vectorize(V)}{\partial \vectorize(V)} \end{bmatrix}\nonumber \\
+&= \begin{bmatrix} \bw_i\otimes \bq_i \\ \bh_i\otimes \bp_i \end{bmatrix}
+%&= \begin{bmatrix} \bw_i\otimes \bq_i \\ \bh_i\otimes \bp_i \end{bmatrix}_{(Md+Nd)\times 1}
+\label{eq:Jacob}.
+\end{align}
+The above two gradients can be merged as following:
+\begin{align}
+\frac{\partial f}{\partial \vectorize(U,V)} 
+&=\begin{bmatrix} \frac{\partial f}{\partial \vectorize(U)} \\ \frac{\partial f}{\partial \vectorize(V)} \end{bmatrix}\nonumber\\
+&=\begin{bmatrix} \lambda \vectorize(U) +  \sum_{i=1}^l b_i (\bw_i\otimes\bq_i) \\ \lambda \vectorize(V) +  \sum_{i=1}^l b_i (\bh_i\otimes\bp_i)\end{bmatrix}\nonumber\\
+&=\lambda \vectorize(U,V) + \sum_{i=1}^l b_i \bj_i
+\label{eq:GradUV}.
+\end{align}
+
 The Hessian matrix of \eqref{eq:reMF} is 
+\begin{align}
+\pdv{\vectorize(U,V)^T} \frac{\partial f}{\partial \vectorize(U,V)}
+&=\lambda I + \sum_{i=1}^{l}\pdv{\vectorize(U,V)^T} (b_i \bj_i)\nonumber\\
+&=\lambda I + \sum_{i=1}^{l} \Bigl( \pdv{b_i^T} (b_i \bj_i) \frac{\partial b_i}{\partial \vectorize(U,V)^T} + \pdv{\bj_i^T} (b_i \bj_i) \frac{\partial \bj_i}{\partial \vectorize(U,V)^T} \Bigr)\nonumber\\
+&=\lambda I + \sum_{i=1}^{l} \Bigl( \bj_i \frac{\partial b_i}{\partial z_i} \frac{\partial z_i}{\partial \vectorize(U,V)^T} + b_i \frac{\partial \bj_i}{\partial \vectorize(U,V)^T} \Bigr)\nonumber\\
+&=\lambda I + \sum_{i=1}^{l} \bj_i \bj_i^T + \sum_{i=1}^{l} b_i \frac{\partial \bj_i}{\partial \vectorize(U,V)^T} 
+\label{eq:H}
+\end{align}
+where $I$ is the identity matrix.
+
+
+\begin{comment}
 \begin{align}    
         \nabla^2 f(U, V) &= \lambda I + \frac{1}{2}\sum_{i=1}^{l}\bj_i B_i \bj_i^T 
                      + \frac{1}{2}\sum_{i=1}^l \pdv{\xi_i}{z_i} (\frac{\partial \bj_i}{\partial U}, \frac{\partial \bj_i}{\partial V})\nonumber \\
         &= \lambda I + \sum_{i=1}^{l}\bj_i\bj_i^T + \sum_{i=1}^l b_i (\frac{\partial \bj_i}{\partial U}, \frac{\partial \bj_i}{\partial V})
     \label{eq:H}    
 \end{align}
-where I is the identity matrix, $(\cdot,\cdot)$ is the horizontal concatenation of two matrices, and
+where $I$ is the identity matrix, $(\cdot,\cdot)$ is the horizontal concatenation of two matrices, and
 \begin{equation}
     B_i = \pdv[2]{\xi_i}{z_i} = 2
     \label{eq:B_i}.
 \end{equation}
-
+\end{comment}
 %$\nabla^2_{\theta,\theta} z$
 
 For the standard Newton methods, at the $k$th iteration, we find a direction $\bs_k$ minimizing the following second-order approximation of the function value:
