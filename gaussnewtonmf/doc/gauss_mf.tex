@@ -372,13 +372,13 @@ Thus, the preconditioner can be obtained via
     \label{alg:Pcg}
     \begin{algorithmic}[1]
         \State Given $0<\eta<1$ and $G$, the gradient matrix form of \eqref{eq:reMF}. Let $\hat{S}=\bsym{0}_{d\times (M+N)}$.
-        \State Compute $M$ via \eqref{eq:Conder}.
+%        \State Compute $M$ via \eqref{eq:Conder}.
         %\State Calculate $\hat{G} = G \prescript{}{\cdot}{/} M$, $R=-\hat{G}$, $\gamma=\no{R}_F^2$, and $\hat{D}=R$.
-        \State Calculate $R = -G \prescript{}{\cdot}{/} M$, $\hat{D}=R$, and $\gamma^0=\gamma=\|R\|_F^2$.
+        \State Calculate $R = -G$, $\hat{D}=R$, and $\gamma^0=\gamma=\|R\|_F^2$.
         \While {$\sqrt{\gamma} > \eta \sqrt{\gamma^0}$}
-            \State $\hat{D}_h \gets \hat{D} \prescript{}{\cdot}{/} M$
+            \State $\hat{D}_h \gets \hat{D} $
             \State $\hat{\bz}\gets \left( {Q^T}\odot{(W\hat{D}_{hu}^T)}+{P^T}\odot{(H\hat{D}_{hv}^T)} \right) \bsym{1}_{d\times 1}$
-            \State $\hat{D}_h \gets \left(\lambda \hat{D}_h + \begin{bmatrix} Q \bigl(\diag(\hat{\bz}) W \bigr) \, P \bigl ( \diag(\hat{\bz}) H \bigr) \end{bmatrix}\right) \prescript{}{\cdot}{/} M$
+            \State $\hat{D}_h \gets \left(\lambda \hat{D}_h + \begin{bmatrix} Q \bigl(\diag(\hat{\bz}) W \bigr) \, P \bigl ( \diag(\hat{\bz}) H \bigr) \end{bmatrix}\right) $
             \State $\alpha \gets \gamma / \langle \hat{D},\hat{D}_h \rangle$
             \State $\hat{S} \gets\hat{S}+\alpha \hat{D}$
             \State $R \gets R-\alpha \hat{D}_h$
@@ -387,7 +387,7 @@ Thus, the preconditioner can be obtained via
             \State $\hat{D} \gets R+\beta \hat{D}$
             \State $\gamma \gets \gamma^{\text{new}}$
         \EndWhile
-        \State Output $S=\hat{S} \prescript{}{\cdot}{/} M$ as the solution.
+        \State Output $\hat{S}$ as the solution.
     \end{algorithmic}
 \end{algorithm}
 
