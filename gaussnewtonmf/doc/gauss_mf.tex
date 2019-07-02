@@ -70,7 +70,7 @@ Given a rating matrix R,  matrix factorization (MF) is a technique to find two d
     \frac{\lambda}{2} (\|U\|^2_F + \|V\|^2_F	)
     \label{eq:MF}
 \end{equation}
-where $(m, n) \in R$ indicates that rating $r_{m,n}$ is available, and $\lambda$ is regularization coeﬃcients for avoiding over-ﬁtting.
+where $(m, n) \in R$ indicates that rating $r_{m,n}$ is available, $\lambda$ is regularization coeﬃcients for avoiding over-ﬁtting, and $\|\cdot\|_F$ is the Frobenius norm.
 %$R$ is is the rating matrix that includes the feedback of the $m$th user on $n$th item at the ($m$, $n$) entry $r_{m n}$. %The matrix factorization is technique to find two dense matrices $U \in \bbr^{d \times M}$ and $V \in \bbr^{d \times N}$ such that $r_{m,n} = \bu_m^T\bv_n$, where $\bu_m \in \bbr^d$ and $\bv_n \in \bbr^d$ are respectively the $m$th column of $U$ and the $n$th column of $V$.  
 
 In fact, the problem \eqref{eq:MF} is a special case of Factorization Machines (FM). In order to show the connection between MF and FM and reuse the former derivation, we apply formulations for \eqref{eq:MF} and have
@@ -114,17 +114,16 @@ If $H_k$ is positive definite, then \eqref{eq:QP} is equivalent to solving the f
     H_k\bs = -\bg_k
 \label{eq:HLE}
 \end{equation}
+In practice, any optimization method needs a stopping condition.
+%Here, we consider a relative setting \eqref{eq:AntStop}.
+%If $\|\nabla f(U,V)\|_F >0$, Algorithm \ref{alg:LrFramework} conducts at least one Newton step and the function value of $f(U,V)$ must be decreased. In other words, 
+If the condition is not satisfied yet, our minimization procedure must continue to update $U$ and $V$ rather than stay at the same point.
+
 
 Unfortunately, the convexity of \eqref{eq:reMF} brings some difficulties in developing a Newton-type FM solver.
 The Hessian matrix of \eqref{eq:reMF}  is not alway positive-definite, so a direct application of Newton method may be failed to find a descent direction.
 We may consider a positive-definite approximation of the Hessian matrix such as Gauss-Newton method. 
-That is, we remove the last term in \eqref{eq:H} and obtain the following positive-definite matrix.
-\begin{equation}
-    \begin{aligned}
-    G &= \lambda I + \sum_{i=1}^{l}\bj_i\bj_i^T
-    \label{eq:G}
-    \end{aligned}
-\end{equation}
+%That is, we remove the last term in \eqref{eq:H} and obtain the positive-definite matrix \eqref{eq:G}.
 
 The Gauss-Newton method can be viewed as a modification of Newton method with line search. Instead of solving \eqref{eq:HLE}, we solve the following linear system to find a $\bs_k$ for factorization machines problem
 \begin{equation}
@@ -136,18 +135,40 @@ where $G_k$ is the Gauss-Newton matrix at $k$th iteration.
 
 In practice, \eqref{eq:GLE} may not need to exactly solved. Therefore, truncated Newton methods have been introduced to approximately solve \eqref{eq:GLE}. Iterative methods such as conjugate gradient method are often used for approximately solving \eqref{eq:GLE}, so at each iteration an inner iterative process is involved.
 
-Another difficulty to solve \eqref{eq:GLE} is that storing the Gauss-Newton matrix is not possible if the dimensionality is very large. To overcome the memory issue. 
+Another difficulty to solve \eqref{eq:GLE} is that storing the Gauss-Newton matrix is not possible if the dimensionality is very large. 
+Let
+\begin {equation*}
+\tilde{\bx_i} = \begin{bmatrix} \bw_i\otimes (V\bh_i) \\ \bh_i\otimes (U\bw_i) \end{bmatrix}
+\label{eq:xi}
+\end{equation*}
+and
+\begin {equation*}
+\tilde{X} = [\tilde{\bx_1},\tilde{\bx_2}\dots,\tilde{\bx_l}]^T \in \bbr^{l\times d(M+N)}
+\label{eq:X}.
+\end{equation*}
+To overcome the memory issue, 
 %Some previous works showed that for linear problems, the conjugate gradient method that mainly requires a sequence of Hessian-vector products can performed without explicitly forming the Hessian matrix:
-Some previous works showed that for matrices in a form similar to \eqref{eq:G}, the matrix-vector product at each step in conjugate gradient (CG) method can be conducted without explicitly forming the Hessian matrix:
+some previous works showed that for matrices in a form similar to \eqref{eq:G}, the matrix-vector product at each step in conjugate gradient (CG) method can be conducted without explicitly forming the Hessian matrix:
 \begin{equation}
-    H\bs = \lambda\bs + X^T(D(X^T\bs))
+    H\bs = \lambda\bs + \tilde{X}^T(D(\tilde{X}\bs))
 \label{eq:Hv}
 \end{equation}
-where $X$ is the data matrix and $\bs$ is the direction in the CG procedure. 
+where $\bs$ is the direction in the CG procedure and $D$ is a $l\times l$ identity matrix. 
 
-After a direction is found in our Newton method, we must decide the step size taken along that direction. To guarantee a sufficient objective function reduction, here we consider a back-tracking line search to find the largest step size $\theta\in\{1,\beta,\beta^2,\dots\}$ satisfying Armijo rule,
+After a direction is found in our Newton method, we must decide the step size taken along that direction. 
+Let 
 \begin{equation}
-    f(U+\theta S_{u},V+\theta S_{v}) - f(U,V) \le \theta\nu gs,
+\bs = \vectorize(S)
+\label{eq:s}
+\end{equation} 
+and 
+\begin{equation}
+S = \begin{bmatrix} S_u & S_v \end{bmatrix}
+\label{eq:susv}.
+\end{equation}  
+To guarantee a sufficient objective function reduction, here we consider a back-tracking line search to find the largest step size $\theta\in\{1,\beta,\beta^2,\dots\}$ satisfying Armijo rule,
+\begin{equation}
+    f(U+\theta S_{u},V+\theta S_{v}) - f(U,V) \le \theta\nu {\bg}^T\vectorize(S),
     \label{eq:LineSearchRule}
 \end{equation}
 where $\nu\in(0,1)$ and $\beta\in(0,1)$ are pre-specified constants.
@@ -155,13 +176,17 @@ Recalculating the function value at each $U+\theta S_{u}$ and $V+\theta S_{v}$ i
 However, the following trick in \cite{GXY09a} can be employed.
 Assume that
 \begin{equation}
-    \tilde{y}_i = (U\bw_i)^T(V\bh_i), \tilde{\Delta}_i=(S_u\bw_i)^T(V\bh_i)+(U\bw_i)^T(S_v\bh_i)\text{ and }\tilde{\Delta}_i^\prime = (S_u\bw_i)^T(S_v\bh_i),\; i=1,\dots,l    
+    \tilde{y}_i = (U\bw_i)^T(V\bh_i) 
+    \label{eq:predicted_y},
+\end{equation}
+\begin{equation}
+    {\Delta}_i=(S_u\bw_i)^T(V\bh_i)+(U\bw_i)^T(S_v\bh_i)\text{ and }{\Delta}_i^\prime = (S_u\bw_i)^T(S_v\bh_i),\; i=1,\dots,l    
     \label{eq:LsRequire}
 \end{equation}
 are available.
 At an arbitrary $\theta$, we can calculate
 \begin{equation}
-    \left((U+\theta S_u)\bw_i\right)^T\left((V+\theta S_v)\bh_i\right) = \tilde{y}_i + \theta\tilde{\Delta}_i + {\theta}^2\tilde{\Delta}_i^\prime    
+    \left((U+\theta S_u)\bw_i\right)^T\left((V+\theta S_v)\bh_i\right) = \tilde{y}_i + \theta{\Delta}_i + {\theta}^2{\Delta}_i^\prime    
     \label{eq:ExpTheta}
 \end{equation}
 to get the new output value.
@@ -170,16 +195,16 @@ By further maintaining
     \langle{U}{,}{S_u}\rangle,\langle{V}{,}{S_v}\rangle,\|S\|_F^2,\text{ and } {\bg}^T{\bs},
     \label{eq:LsRequire1}
 \end{equation}
-the total cost of checking the condition of \eqref{eq:LineSearchRule} is merely $\bbO{l}$ because
+where $\langle\cdot{,}\cdot\rangle$ is the inner product of two matrices, the total cost of checking the condition of \eqref{eq:LineSearchRule} is merely $\bbO{l}$ because
 \begin{equation}
     \begin{aligned}
         f(U+\theta S_{u},V+\theta S_{v}) - f(U,V) =& \frac{\lambda}{2}\left( 2\theta \langle{U}{,}{S_u}\rangle + 2\theta \langle{V}{,}{S_v}\rangle + \theta^2\|S\|_F^2 \right)\\ 
-        &+ \sum_{i=1}^l \xi(\tilde{y}_i + \theta\tilde{\Delta}_i + {\theta}^2\tilde{\Delta}_i^\prime;y_i) -\sum_{i=1}^l \xi(\tilde{y}_i;y_i)        
+        &+ \sum_{i=1}^l \xi(\tilde{y}_i + \theta{\Delta}_i + {\theta}^2{\Delta}_i^\prime;y_i) -\sum_{i=1}^l \xi(\tilde{y}_i;y_i)        
     \end{aligned}
-    \label{eq:LrObjFast}
+    \label{eq:LrObjFast}.
 \end{equation}
-where $\langle\cdot{,}\cdot\rangle$ is the inner product of two matrices.
 
+\section{Gradient and Gauss-Newton Matrix-Vector Products}
 To compute the gradient of \eqref{eq:reMF}, we begin with the following properties of  the Kronecker product among matrices $A$, $B$ and $X$:
 \begin{equation}
 (B^T \otimes A)\vectorize(X) = \vectorize(AXB)
@@ -203,16 +228,32 @@ The predicted value also can be represented as
 &= (\bw_i \otimes (V \bh_i))^T \vectorize(U)
 \label{eq:predict_VhUw}.
 \end{align}
-Then, we define $\bp_i = U\bw_i$, $\bq_i = V\bh_i$, $z_i = \bp_i^T\bq_i$, $b_i = z_i-y_i = \bp_i^T\bq_i-y_i$, the loss function $\xi_i = b_i^2 = \Bigl(\bp_i^T\bq_i-y_i\Bigr)^2$, $Q=[\bq_1,\dots,\bq_l] \in \bbr^{d\times l}$, $W=[\bw_1,\dots,\bw_l]^T \in \bbr^{l\times M}$, $P=[\bp_1,\dots,\bp_l] \in \bbr^{d\times l}$, and $H=[\bh_1,\dots,\bh_l]^T \in \bbr^{l\times N}$.
+Then, we define 
+\begin{equation*}
+\bp_i = U\bw_i ,
+\bq_i = V\bh_i ,
+%z_i = \bp_i^T\bq_i ,
+b_i = \tilde{y}_i-y_i = \bp_i^T\bq_i-y_i ,
+\end{equation*}
+the loss function 
+\begin{equation*}
+\xi_i = b_i^2 = \Bigl(\bp_i^T\bq_i-y_i\Bigr)^2, 
+\end{equation*}
+\begin{equation*}
+Q=[\bq_1,\dots,\bq_l] \in \bbr^{d\times l},
+W=[\bw_1,\dots,\bw_l]^T \in \bbr^{l\times M},
+P=[\bp_1,\dots,\bp_l] \in \bbr^{d\times l},
+H=[\bh_1,\dots,\bh_l]^T \in \bbr^{l\times N}.
+\end{equation*}
 The gradient of \eqref{eq:reMF} is
 \begin{align}
-\nabla {f}(\vectorize(U, V)) = \lambda \vectorize(U,V) + \frac{1}{2}\sum_{i=1}^{l}\pdv{\xi_i}{z_i}\begin{bmatrix} \frac{\partial z_i}{\partial \vectorize(U)} \\ \frac{\partial z_i}{\partial \vectorize(V)} \end{bmatrix}
+\nabla {f}(\vectorize(U, V)) = \lambda \vectorize(U,V) + \frac{1}{2}\sum_{i=1}^{l}\pdv{\xi_i}{\tilde{y}_i}\begin{bmatrix} \frac{\partial \tilde{y}_i}{\partial \vectorize(U)} \\ \frac{\partial \tilde{y}_i}{\partial \vectorize(V)} \end{bmatrix}
 \label{eq:gradUV}.
 \end{align}
-We define the following Jocobian of $z_i$ is
+From \eqref{eq:predict_VhUw}, \eqref{eq:predict_UwVh} and \eqref{eq:predicted_y},we define the following Jocobian of $\tilde{y}_i$ as
 \begin {align}
 %\bj_i = (\bw_i\otimes \bq_i, \bh_i\otimes \bp_i)
-\bj_i &= \begin{bmatrix} \frac{\partial z_i}{\partial \vectorize(U)} \\ \frac{\partial z_i}{\partial \vectorize(V)} \end{bmatrix}\nonumber \\
+\bj_i &= \begin{bmatrix} \frac{\partial \tilde{y}_i}{\partial \vectorize(U)} \\ \frac{\partial \tilde{y}_i}{\partial \vectorize(V)} \end{bmatrix}\nonumber \\
 &= \begin{bmatrix} \frac{\partial (\bw_i \otimes (V \bh_i))^T\vectorize(U)}{\partial \vectorize(U)} \\ \frac{\partial (\bh_i \otimes (U \bw_i))^T\vectorize(V)}{\partial \vectorize(V)} \end{bmatrix}\nonumber \\
 &= \begin{bmatrix} \bw_i\otimes \bq_i \\ \bh_i\otimes \bp_i \end{bmatrix}
 %&= \begin{bmatrix} \bw_i\otimes \bq_i \\ \bh_i\otimes \bp_i \end{bmatrix}_{(Md+Nd)\times 1}
@@ -225,10 +266,10 @@ From \eqref{eq:gradUV} and \eqref{eq:Jacob}, the gradient is
 &= \lambda \vectorize(U,V) + \begin{bmatrix} \sum_{i=1}^l b_i (\bw_i\otimes\bq_i) \\ \sum_{i=1}^l b_i (\bh_i\otimes\bp_i)\end{bmatrix}\label{eq:GradU_K1}\\
 &= \lambda \vectorize(U,V) + \begin{bmatrix} \sum_{i=1}^l \vectorize\left(\bq_i b_i \bw_i^T \right) \\ \sum_{i=1}^l \vectorize\left(\bp_i b_i \bh_i^T \right)\end{bmatrix}\label{eq:GradU_K2}\\
 &= \lambda \vectorize(U,V) + \begin{bmatrix} \vectorize\left( \sum_{i=1}^l \bq_i b_i \bw_i^T \right) \\ \vectorize\left( \sum_{i=1}^l \bp_i b_i \bh_i^T \right)\end{bmatrix}\nonumber\\
-&= \lambda \vectorize(U,V) + \begin{bmatrix} \vectorize \Bigl ( Q \bigl(\diag(\bsym{b}) W \bigr)  \Bigr) \\ \vectorize \Bigl ( P \bigl(\diag(\bsym{b}) H \bigr)  \Bigr)\end{bmatrix}\nonumber\\
+&= \lambda \vectorize(U,V) + \begin{bmatrix} \vectorize \Bigl ( Q \bigl(\diag(\bsym{b}) W \bigr)  \Bigr) \\ \vectorize \Bigl ( P \bigl(\diag(\bsym{b}) H \bigr)  \Bigr)\end{bmatrix}
 \label{eq:Grad},
 \end{align}
-where $\diag(\bsym{b})$ is a diagonal matrix in which the $i$th diagonal element is $b_i$, and for the second term in \eqref{eq:GradU_K1} and \eqref{eq:GradU_K2} we apply \eqref{eq:kronecker_vec}. 
+where $\diag(\bsym{b})$ is a diagonal matrix in which the $i$th diagonal element is $b_i$, and for the second term in \eqref{eq:GradU_K2} we apply \eqref{eq:kronecker_vec}. 
 Since $W$ and $H$ is highly sparse matrices, we need to calculate $\diag(\bsym{b})W$ and $\diag(\bsym{b})H$ first.
 Then, the main operation for gradient evaluation is a matrix-matrix product that costs $\bbO{2d\times l}$.
 \par
@@ -238,32 +279,40 @@ The Hessian matrix of \eqref{eq:reMF} is
 \pdv{\vectorize(U,V)^T} \frac{\partial f}{\partial \vectorize(U,V)}
 &=\lambda I + \sum_{i=1}^{l}\pdv{\vectorize(U,V)^T} (b_i \bj_i)\nonumber\\
 &=\lambda I + \sum_{i=1}^{l} \Bigl( \pdv{b_i^T} (b_i \bj_i) \frac{\partial b_i}{\partial \vectorize(U,V)^T} + \pdv{\bj_i^T} (b_i \bj_i) \frac{\partial \bj_i}{\partial \vectorize(U,V)^T} \Bigr)\nonumber\\
-&=\lambda I + \sum_{i=1}^{l} \Bigl( \bj_i \frac{\partial b_i}{\partial z_i} \frac{\partial z_i}{\partial \vectorize(U,V)^T} + b_i I \frac{\partial \bj_i}{\partial \vectorize(U,V)^T} \Bigr)\nonumber\\
+&=\lambda I + \sum_{i=1}^{l} \Bigl( \bj_i \frac{\partial b_i}{\partial \tilde{y}_i} \frac{\partial \tilde{y}_i}{\partial \vectorize(U,V)^T} + b_i I \frac{\partial \bj_i}{\partial \vectorize(U,V)^T} \Bigr)\nonumber\\
 &=\lambda I + \sum_{i=1}^{l} \bj_i \bj_i^T + \sum_{i=1}^{l} b_i \frac{\partial \bj_i}{\partial \vectorize(U,V)^T} 
 \label{eq:H}
 \end{align}
 where $I$ is the identity matrix.
+We remove the last term in \eqref{eq:H} and obtain the following positive-definite matrix.
+\begin{equation}
+    \begin{aligned}
+    G &= \lambda I + \sum_{i=1}^{l}\bj_i\bj_i^T
+    \label{eq:G}
+    \end{aligned}
+\end{equation}
 
-Specifically, from (\ref{eq:G}) and $\bs=\vectorize(S)$, we first calculate
+
+Specifically, from (\ref{eq:G}), (\ref{eq:Jacob}) and (\ref{eq:s}), we first calculate
 \begin{equation}
 \begin{aligned}
-    a_i&= \bj_i^T \vectorize(S)\\
+    z_i&= \bj_i^T \vectorize(S)\\
     &=\begin{bmatrix} \bw_i^T\otimes\bq_i^T & \bh_i^T\otimes\bp_i^T \end{bmatrix}\begin{bmatrix}\vectorize(S_u)\\ \vectorize(S_v)\end{bmatrix}\\
     &=\bq_i^T S_u \bw_i + \bp_i^T S_v \bh_i, \text{ }i=1,\dots,l
-    \label{eq:DefZi}
+    \label{eq:DefZi},
 \end{aligned}
 \end{equation}
 or equivalently
 \begin{equation}
-    \textbf{\textit{a}} = \biggl({Q^T}\odot{(WS_u^T)}+{P^T}\odot{(HS_v^T)}\biggr) \bsym{1}_{d\times 1}
+    \textbf{\textit{z}} = \biggl({Q^T}\odot{(WS_u^T)}+{P^T}\odot{(HS_v^T)}\biggr) \bsym{1}_{d\times 1}
     \label{eq:CalcZ},
 \end{equation}
-where $\odot$ is the Hadamard product of two matrices.  Next,
+where $\odot$ is the Hadamard product (i.e., element-wise product) of two matrices.  Next, from (\ref{eq:DefZi}), (\ref{eq:G}), (\ref{eq:Jacob}), (\ref{eq:s}) and  (\ref{eq:kronecker_vec}),
 \begin{align}
-    G \bs         &= \lambda \vectorize(S) + \sum_{i=1}^l a_i \bj_i \\
-                  &= \lambda \vectorize(S) + \sum_{i=1}^l a_i \begin{bmatrix} \bw_i\otimes \bq_i \\ \bh_i\otimes \bp_i \end{bmatrix} \nonumber \\
-                  &= \lambda \vectorize(S) +  \sum_{i=1}^l \begin{bmatrix}\vectorize\left(a_i \bq_i \bw_i^T\right) \\ \vectorize\left(a_i \bp_i \bh_i^T\right)\end{bmatrix} \nonumber  \\
-                  &= \lambda \vectorize(S) +  \begin{bmatrix}\vectorize \Bigl ( Q \bigl(\diag(\textbf{\textit{a}}) W \bigr) \Bigr)\\\vectorize \Bigl ( P \bigl ( \diag(\textbf{\textit{a}}) H \bigr) \Bigr)\end{bmatrix} \label{eq:Hv},
+    G \bs         &= \lambda \vectorize(S) + \sum_{i=1}^l z_i \bj_i \\
+                  &= \lambda \vectorize(S) + \sum_{i=1}^l z_i \begin{bmatrix} \bw_i\otimes \bq_i \\ \bh_i\otimes \bp_i \end{bmatrix} \nonumber \\
+                  &= \lambda \vectorize(S) +  \sum_{i=1}^l \begin{bmatrix}\vectorize\left(z_i \bq_i \bw_i^T\right) \\ \vectorize\left(z_i \bp_i \bh_i^T\right)\end{bmatrix} \nonumber  \\
+                  &= \lambda \vectorize(S) +  \begin{bmatrix}\vectorize \Bigl ( Q \bigl(\diag(\textbf{\textit{z}}) W \bigr) \Bigr)\\\vectorize \Bigl ( P \bigl ( \diag(\textbf{\textit{z}}) H \bigr) \Bigr)\end{bmatrix} \label{eq:Hv},
 \end{align}
 
 We investigate the complexity of the Hessian-vector product. The first term of 
@@ -285,7 +334,7 @@ Therefore, the cost of one Hessian-vector  is $\bbO{d \times l}$. After $\bs_k$ 
     \caption{An implementation for solving \eqref{eq:reMF} by operations on matrix veriables without vectorizing them.}
     \label{alg:LrFramework}
     \begin{algorithmic}[1]
-        \State Given $0< \epsilon < 1$ and the current $(U,V)$.
+        \State Given $0< \epsilon < 1$ and the initial $(U,V)$.
         \State $Q \gets VH^T$, $P \gets UW^T$
         \State Compute and cache $\bsym{\tilde{y}}= (Q \odot P)^T\bsym{1}_{d\times 1}$.
         \State $\bb \leftarrow \byy - \by $
@@ -324,25 +373,25 @@ Therefore, the cost of one Hessian-vector  is $\bbO{d \times l}$. After $\bs_k$ 
     \end{algorithmic}
 \end{algorithm}
 
-In practice, any optimization method needs a stopping condition.
-Here, we consider a relative setting
+%In practice, any optimization method needs a stopping condition.
+For stopping condition, we consider a relative setting
 \begin{equation}
     \|\nabla f(U,V)\|_F \le \epsilon \|\nabla f(U_{\text{init}},V_{\text{init}})\|_F,
     \label{eq:AntStop}
 \end{equation}
 where $0<\epsilon<1$ is a small stopping tolerance and $(U_{\text{init}},V_{\text{init}})$ indicates the initial point of the model. 
-If $\|\nabla f(U,V)\|_F >0$, Algorithm \ref{alg:LrFramework} conducts at least one Newton step and the function value of $f(U,V)$ must be decreased. In other words, if the condition in \eqref{eq:AntStop} is not satisfied yet, our minimization procedure must continue to update $U$ and $V$ rather than stay at the same point.
+If $\|\nabla f(U,V)\|_F >0$, Algorithm \ref{alg:LrFramework} conducts at least one Newton step and the function value of $f(U,V)$ must be decreased. %In other words, if the condition in \eqref{eq:AntStop} is not satisfied yet, our minimization procedure must continue to update $U$ and $V$ rather than stay at the same point.
 
-We consider a preconditioner $M$ to approximately factorize $H$ such that $H \approx {M}{M}^T$, and then use CG to solve
+We consider a preconditioner $\tilde{M}$ to approximately factorize $H$ such that $H \approx \tilde{M}\tilde{M}^T$, and then use CG to solve
 \begin{equation}
     \hat{H} \hat{\bs}  = \hat{\bg},
     \label{eq:PcondSys}
 \end{equation}
-where $\hat{H}={M}^{-1}{H}{M}^{-T}$ and $\hat{\bg}={M}^{-1}{\bg}$.
-Once $\hat{\bs}$ is found, the solution of (\ref{eq:HLE}) can be recovered by ${\bs}={M}^{-T}\hat{\bs}$. 
+where $\hat{H}=\tilde{M}^{-1}{H}\tilde{M}^{-T}$ and $\hat{\bg}=\tilde{M}^{-1}{\bg}$.
+Once $\hat{\bs}$ is found, the solution of (\ref{eq:HLE}) can be recovered by ${\bs}=\tilde{M}^{-T}\hat{\bs}$. 
 Then, we consider the following diagonal preconditioner for solving \eqref{eq:HLE} as an example.
 \begin{equation}
-    {M}={M}^T=\diag({\bsym{h}}),
+    \tilde{M}=\tilde{M}^T=\diag({\bsym{h}}),
     \label{eq:Conder}
 \end{equation}
 where
@@ -363,7 +412,7 @@ we have
 \end{align}
 Thus, the preconditioner can be obtained via
 \begin{equation}
-    {M}={M}^T=\diag \Bigl( \sqrt{ {\lambda} \bsym{1}_{d(M+N) \times 1} + \begin{bmatrix} \vectorize \bigl((Q \odot Q) (W \odot W) \bigr) \\ \vectorize \bigl((P \odot P) (H \odot H) \bigr) \end{bmatrix} } \Bigr).
+    \tilde{M}=\tilde{M}^T=\diag \Bigl( \sqrt{ {\lambda} \bsym{1}_{d(M+N) \times 1} + \begin{bmatrix} \vectorize \bigl((Q \odot Q) (W \odot W) \bigr) \\ \vectorize \bigl((P \odot P) (H \odot H) \bigr) \end{bmatrix} } \Bigr).
     \label{eq:Conder}
 \end{equation}
 
@@ -396,6 +445,18 @@ We aim to improve the test performance in the case which \cite{test17a} face, so
 \subsection{Data Sets and Parameters}
 \begin{table}[H]
 \centering
+\begin{tabular}{r|rr}
+Data Set   & \tt movielens10m & \tt netflix  \\ \hline
+M          & 71,567        & 2,649,429  \\
+N          & 65,133        & 17,770    \\
+\#Training & 9,301,274      & 99,072,112 \\
+\#Test     & 698,780       & 1,408,395 
+\end{tabular}
+\caption{The original statistics for each data set.}
+\label{tab:original_data}
+\end{table}
+\begin{table}[H]
+\centering
 \begin{tabular}{|c|c|l|c|c|c|l|c|c|c|c|}
 \hline
 \multicolumn{4}{|c|}{\tt movielens10m}                                    & \multicolumn{4}{c|}{\tt neflix}                                             & A                       & B                       & C                                            \\ \hline
@@ -407,14 +468,17 @@ We aim to improve the test performance in the case which \cite{test17a} face, so
 \caption{Distributions of ratings.}
 \label{tab:data_dist}
 \end{table}
-To reproduce bad cases in ANT and ANT-P, we rebuild imbalance datas from {\tt movielens10m} and {\tt netflix}. For each data set we merge the original training set and test set, and then randomly split it into new training set, validation set, and test set by ratio $8:1:1$. To stress the effect of imbalance in data, we change those ratings which are less than or equal to $2$ to $1$ and change the other ratings to $5$ from original {\tt movielens10m} data. Similarly, we change those ratings which are large than $1$ to $5$ from original {\tt netflix}. In addition, we further create $4$ kinds of datasets from the rebuilt datasets by changing those ratings which are $5$ into $50$ and $100$. The distribution of ratings of these imbalance data shows in Table \ref{tab:data_dist}.
+We consider two public datasets for the experiment:  {\tt movielens10m} and {\tt netflix}. The
+original training/test split is in Table \ref{tab:original_data}.
+To reproduce bad cases in ANT and ANT-P, we rebuild imbalance datas from {\tt movielens10m} and {\tt netflix}. 
+For each data set we merge the original training set and test set, and then randomly split it into new training set, validation set, and test set by ratio $8:1:1$. To stress the effect of imbalance in data, we change those ratings which are less than or equal to $2$ to $1$ and change the other ratings to $5$ from original {\tt movielens10m} data. Similarly, we change those ratings which are large than $1$ to $5$ from original {\tt netflix}. In addition, we further create $4$ kinds of datasets from the rebuilt datasets by changing those ratings which are $5$ into $50$ and $100$. The distribution of ratings of these imbalance data shows in Table \ref{tab:data_dist}.
 \begin{table}[H]
     \centering    
     \begin{tabular}{c|ccccc|ccccc|ccccc}
 rating        & \multicolumn{5}{c|}{A}            & \multicolumn{5}{c|}{B}    & \multicolumn{5}{c}{C}     \\ \hline
 solver        & acg  & als  & apcg & g     & pg   & acg & als & apcg & g & pg & acg & als & apcg & g & pg \\ \hline
-learning rate & 0.09 & 0.09 & 0.09 & 0.065 & 0.08 & *   & *   & *    & * & *  & *   & *   & *    & * & *  \\
-iteration     & 31   & 15   & 37   & 18    & 12   & *   & *   & *    & * & *  & *   & *   & *    & * & * 
+learning rate & 0.09 & 0.09 & 0.09 & 0.065 & 0.08 & 0.91   & 1   & 0.99    & 0.7 & 0.95  & 1.95   & 2.2   & 2    & 1.65 & 1.9  \\
+iteration     & 31   & 15   & 37   & 18    & 12   & 11   & 15   & 19    & 16 & 14  & 20   & 12   & 19    & 20 & 15 
 \end{tabular}
     \caption{Parameters on different ratings of {\tt movielens10m}.}
     \label{tab:parameters_ml}
@@ -424,13 +488,13 @@ iteration     & 31   & 15   & 37   & 18    & 12   & *   & *   & *    & * & *  & 
     \begin{tabular}{c|ccccc|ccccc|ccccc}
 rating        & \multicolumn{5}{c|}{A}    & \multicolumn{5}{c|}{B}    & \multicolumn{5}{c}{C}     \\ \hline
 solver        & acg & als & apcg & g & pg & acg & als & apcg & g & pg & acg & als & apcg & g & pg \\ \hline
-learning rate & *   & *   & *    & * & *  & *   & *   & *    & * & *  & *   & *   & *    & * & *  \\
-iteration     & *   & *   & *    & * & *  & *   & *   & *    & * & *  & *   & *   & *    & * & * 
+learning rate & 0.04   & 0.05   & 0.04    & 0.03 & 0.05  & 0.45   & 0.6   & 0.6    & 0.4 & 0.55  & 0.95   & 1.2   & 1.15    & 0.5 & 1.05  \\
+iteration     & 48   & 25   & 50    & 24 & 29  & 37   & 25   & 50    & 23 & 32  & 28   & 24   & 40    & 20 & 20 
 \end{tabular}
     \caption{Parameters on different ratings of {\tt netflix}.}
     \label{tab:parameters_nf}
 \end{table}
-We find learning rate and outer iteration in each solver by using grid search on validation set and training set, and set $k=100$ in following experiments. The parameters shows in Table \ref{tab:parameters_ml} and Table \ref{tab:parameters_nf}.
+We find learning rate and outer iteration in each solver by using grid search on validation set and training set, and set $k=100$ in following experiments. Maximum iteration is $50$. The parameters shows in Table \ref{tab:parameters_ml} and Table \ref{tab:parameters_nf}.
 
 \subsection{Frequency-aware Regularization}
 It's well-known that give frequent user/item more penalties can lead to better testing performance on MF problem. In our experiments, we replace the regularization term in \eqref{eq:reMF} and get the following new formulation
@@ -441,6 +505,29 @@ It's well-known that give frequent user/item more penalties can lead to better t
     \label{eq:faMF}
 \end{equation}
 \subsection{Evaluation and Comparison on Test Performance}
+\begin{table}[H]
+\centering
+\begin{tabular}{c|c|ccccc}
+\multicolumn{2}{c|}{solver} & acg     & als     & apcg    & g                & pg      \\ \hline
+\multirow{3}{*}{RMSE}  & A  & 1.1615  & 1.1607  & 1.1623  & \textbf{1.1578}  & 1.1609  \\ \cline{2-7} 
+                       & B  & 14.1998 & 14.2197 & 14.2156 & \textbf{14.1724} & 14.2266 \\ \cline{2-7} 
+                       & C  & 28.6939 & 28.7296 & 28.8117 & \textbf{28.6727} & 28.7260
+\end{tabular}
+\caption{RMSE of {\tt movielens10m}.}
+    \label{tab:rmse_ml}
+\end{table}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{c|c|ccccc}
+\multicolumn{2}{c|}{solver} & acg     & als    & apcg    & g               & pg      \\ \hline
+\multirow{3}{*}{RMSE}  & A  & 0.7438  & 0.7424 & 0.7470  & \textbf{0.7412} & 0.7436  \\ \cline{2-7} 
+                       & B  & 9.0954  & 9.0927 & 9.1078  & \textbf{9.0709} & 9.0976  \\ \cline{2-7} 
+                       & C  & 18.3660 & 18.3697      & 18.3847 & \textbf{18.3206}      & 18.3814
+\end{tabular}
+\caption{RMSE of {\tt netflix}.}
+    \label{tab:rmse_nf}
+\end{table}
 
 \clearpage\newpage
 \bibliographystyle{abbrvnat}
