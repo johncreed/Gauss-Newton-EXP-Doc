@@ -1,0 +1,82 @@
+\begin{algorithm}[t]
+    \caption{Solving the modified MF problem \eqref{eq:reMF} via alternating minimization.}
+    \label{alg:AntFramework}
+    \begin{algorithmic}[1]
+        \State Given an initial solution $(U, V)$
+        \While {stopping condition is not satisfied}
+            \State $U   \gets \argmin_{U} f(U,V)$ \label{alg:AntFramework:sub_U}
+            \State $V   \gets \argmin_{V} f(U,V)$
+        \EndWhile
+    \end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+    \caption{An implementation of CG-based truncated Newton method for solving step \ref{alg:AntFramework:sub_U} in Algorithm \ref{alg:AntFramework}.}
+    \label{alg:LrFrameworkU}
+    \begin{algorithmic}[1]
+        \State Given $0< \epsilon < 1$ and the current $(U,V)$.
+        \State $Q \gets VH^T$ %, $P \gets UW^T$
+        \State Compute and cache $\tilde{\by}= (Q \odot UW^T)^T\bsym{1}_{d\times 1}$.
+        \State $\bb \gets \tilde{\by} - \by$
+        %\State $f \gets \frac{\lambda}{2}(\|U\|_F^2 + \|V\|_F^2) + \frac{1}{2}\sum_{i=1}^l {y_i - \tilde{y}_i}$.
+        \State $f \gets \frac{\lambda}{2}(\|U\|_F^2 + \|V\|_F^2) + \frac{1}{2}\sum_{i=1}^l \xi(\tilde{y}_i;y_i)$.
+        \For {$k \gets \{0,1,\dots\}$}
+            %\State Calculate and store $\tilde{y}_i$ and then obtain $b_i$ by \eqref{eq:LossD}, $\forall i$.
+            \State $G \gets \lambda U + Q \bigl(\diag(\bsym{b}) W \bigr)$
+            \If {$k=0$}
+                \State $\|G^0\|_F \gets \|G\|_F$
+            \EndIf
+            \If {$\|G\|_F \le \epsilon\|G^0\|_F$}
+                \State Output $U$ as the solution of step \ref{alg:AntFramework:sub_U} in Algorithm \ref{alg:AntFramework}.
+                \State {\bf break}
+            \EndIf
+            %\State Compute $D_{ii}$ via \eqref{eq:LossDD}, $\forall i$.
+            \State Approximately solve linear system of subproblem $U$ via CG to get an update direction $S$. \label{alg:LrFrameworkU:CG}
+            \State $\bsym{\tilde{\Delta}} = \left( Q^T \odot (WS_u^T) \right)\bsym{1}_{d\times 1}$ %, \bsym{\tilde{\Delta}}^\prime = \left( (WS_u^T) \odot (HS_v^T) \right)\bsym{1}_{d\times 1}$
+            \State $\delta \gets \frac{\lambda}{2} \left( 2 \langle U, S \rangle + \|S\|_F^2 \right) + \frac{1}{2} \sum_{i=1}^l \xi(\tilde{y}_i+\tilde{\Delta}_i;y_i) - \frac{1}{2}\sum_{i=1}^l \xi(\tilde{y}_i;y_i)$
+            \State $U \gets U + S$
+            \State $f \gets f + \delta$
+            \State $\tilde{\by} \gets \tilde{\by} + \bsym{\tilde{\Delta}}$
+            \State $\bb \gets \tilde{\by} - \by$
+
+            %\State Parpare variables listed in \eqref{eq:LsRequireU} and $\bsym{\tilde{\Delta}} = \left( \pointprod{Q^T}{(WS_u^T)}+\pointprod{P^T}{(HS_v^T)} \right)\bsym{1}_{d\times 1}$
+            %\For { $\theta\gets\{1,\beta,\beta^2,\dots\}$ }
+            %    %\State $\delta \gets \frac{\lambda'}{2}\left( 2\theta \dotprod{U}{S} + \theta^2\|S\|_F^2 \right) +\sum_{i=1}^l \log\left(1+e^{-y_i(\tilde{y}_i+\theta\tilde{\Delta}_i)}\right)$
+            %    %\vspace{-.1cm}
+            %    %\Statex \hspace{1.125cm}\phantom{ $\delta \gets$}$- \sum_{i=1}^l \sum_{i=1}^l \log\left(1+e^{-y_i\tilde{y}_i}\right)$.
+            %    \State $\delta \gets \frac{\lambda}{2}\left( 2\theta \langle U, S_u \rangle + 2\theta \langle V, S_v \rangle + \theta^2\|S\|_F^2 \right) + \frac{1}{2} \sum_{i=1}^l \xi(\tilde{y}_i+\theta\tilde{\Delta}_i+{\theta}^2\tilde{\Delta}_i^\prime;y_i) - \frac{1}{2}\sum_{i=1}^l \xi(\tilde{y}_i;y_i)$
+            %    \If { $ \delta \le \theta \nu \langle G,S \rangle $}
+            %        \State $U \gets U +\theta S_u$, $V \gets V +\theta S_v$
+            %        \State $f \gets f+ \delta$
+            %        \State $\bsym{\tilde{y}} \gets \bsym{\tilde{y}}+\theta\bsym{{\Delta}} +{\theta}^2 \bsym{{\Delta}}^\prime$
+            %        \State {\bf break}
+            %    \EndIf
+            %\EndFor
+        \EndFor
+    \end{algorithmic}
+\end{algorithm}
+
+
+\begin{algorithm}[t]
+    \caption{A conjugate gradient method for solving step \ref{alg:LrFrameworkU:CG} in Algorithm \ref{alg:LrFrameworkU} by operations on matrix variables.}
+    \label{alg:Pcg}
+    \begin{algorithmic}[1]
+        \State Given $0<\eta<1$ and $G$, the gradient matrix form of \eqref{eq:reMF}. Let $S=\bsym{0}_{d\times M}$.
+        %\State Compute $\tilde{M}$ via \eqref{eq:Conder}.
+        %\State Calculate $\hat{G} = G \prescript{}{\cdot}{/} M$, $R=-\hat{G}$, $\gamma=\no{R}_F^2$, and $\hat{D}=R$.
+        \State Calculate $R = -G$, $\hat{D}=R$, and $\gamma^0=\gamma=\|R\|_F^2$.
+        \While {$\sqrt{\gamma} > \eta \sqrt{\gamma^0}$}
+            %\State $\hat{D}_h \gets \hat{D} \prescript{}{\cdot}{/} \tilde{M}$
+            \State $\hat{\bz}\gets \left( {Q^T}\odot{(W\hat{D}^T)} \right) \bsym{1}_{d\times 1}$
+            \State $\hat{D}_h \gets \left(\lambda \hat{D} + Q \bigl(\diag(\hat{\bz}) W \bigr)\right)$
+            \State $\alpha \gets \gamma / \langle \hat{D},\hat{D}_h \rangle$
+            \State $S \gets S+\alpha \hat{D}$
+            \State $R \gets R-\alpha \hat{D}_h$
+            \State $\gamma^{\text{new}} \gets \|R\|_F^2$
+            \State $\beta \gets \gamma^{\text{new}}/\gamma$
+            \State $\hat{D} \gets R+\beta \hat{D}$
+            \State $\gamma \gets \gamma^{\text{new}}$
+        \EndWhile
+        \State Output $S$ as the solution.
+    \end{algorithmic}
+\end{algorithm}

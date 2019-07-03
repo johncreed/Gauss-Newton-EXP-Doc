@@ -53,7 +53,7 @@
 \DeclareMathOperator*{\diag}{diag}
 \DeclareMathOperator*{\Diag}{Diag}
 \DeclareMathOperator*{\vectorize}{vec}
-
+\DeclareMathOperator*{\argmin}{arg\,min}
 
 \begin{document}
 \begin{center}
@@ -92,12 +92,12 @@ it is allowed to encode the feature representations in two latent spaces by $U$ 
 \citet{MB16a} mentioned that the function of \eqref{eq:reMF} is a multi-block convex function of $U$ and $V$ so the idea of alternating minimization by using any convex optimization algorithm to solve each sub-problem can be applied. In this work, we focus on solving MF problem. Because it can be regarded as a special case of the variant FM, we mainly study the variant FM in the following.
 
 
-To solve \eqref{eq:reMF}, \citet{test17a} proposed an alternating Newton method (ANT) which is a variant alternating least squares (ALS) and more efficient than stochastic gradient methods and coordinate descent methods. ANT alternately switches between solving these two sub-problems, namely minimizing over $U$ while keeping $V$ fixed and minimizing over $V$ while keeping $U$ fixed. 
+To solve \eqref{eq:reMF}, \citet{WSC18a} proposed an alternating Newton method (ANT) which is a variant alternating least squares (ALS) and more efficient than stochastic gradient methods and coordinate descent methods. ANT alternately switches between solving these two sub-problems, namely minimizing over $U$ while keeping $V$ fixed and minimizing over $V$ while keeping $U$ fixed.
 %Note that because \eqref{eq:MF} is a special case of \eqref{eq:reMF}, ANT also can solve \eqref{eq:MF}.
 %However, we observe an imbalance problem that one of the sub-problems needs a further number of iterations of conjugate gradient method (CG) than the other sub-problem. That is, it is harder to solve one of the sub-problems than the other sub-problem. We guess that solving these two sub-problems at the same time may get better performance, so we try to apply Gauss-Newton method to solve the problem. 
 %In addition, we also try to apply ALS to solve it to observe the extreme case of the imbalance problem.
 
-However, \citet{test17a} showed that test performance of the alternating minimization dose not meet expectation on imbalance data, such as {\tt avazu-app}, {\tt avazu-site} and {\tt criteo}. We guess that the method, alternately solving two sub-problems, is not suitable for solving imbalance data because one of sub-problem may dominate whole problem. Therefore, we try to solve these two sub-problems at the same time by applying Gauss-Newton (GN) method. In other words, GN can update $U$ and $V$ in \eqref{eq:reMF} per iteration instead of updating only one of them per iteration. In this work, 
+However, \citet{WSC18a} showed that test performance of the alternating minimization dose not meet expectation on imbalance data, such as {\tt avazu-app}, {\tt avazu-site} and {\tt criteo}. We guess that the method, alternately solving two sub-problems, is not suitable for solving imbalance data because one of sub-problem may dominate whole problem. Therefore, we try to solve these two sub-problems at the same time by applying Gauss-Newton (GN) method. In other words, GN can update $U$ and $V$ in \eqref{eq:reMF} per iteration instead of updating only one of them per iteration. In this work,
 %we compare performance among ALS, ANT and GN for solving \eqref{eq:reMF} on imbalance data. 
 we aim at investigating how to apply GN to solve MF problem and showing that GN can achieve better performance than ANT and ALS for solving \eqref{eq:reMF} on imbalance data.
 
@@ -441,7 +441,7 @@ Thus, the preconditioner can be obtained via
 \end{algorithm}
 
 \section{Experiments}
-We aim to improve the test performance in the case which \cite{test17a} face, so first it need to reproduce the imbalance data like CTR data. Then, we conduct experiments to compare Gauss-Newton method with ALS and ANT.  
+We aim to improve the test performance in the case which \cite{WSC18a} face, so first it need to reproduce the imbalance data like CTR data. Then, we conduct experiments to compare Gauss-Newton method with ALS and ANT.
 \subsection{Data Sets and Parameters}
 \begin{table}[H]
 \centering
@@ -531,7 +531,10 @@ It's well-known that give frequent user/item more penalties can lead to better t
 
 \clearpage\newpage
 \bibliographystyle{abbrvnat}
-\bibliography{sdp,test}
+\bibliography{sdp}
 %\bibliography{test}
+
+\clearpage\newpage
+\input{appendix}
 
 \end{document}

@@ -1,6 +1,8 @@
 all: output/gauss_mf.pdf
 
-output/%.pdf: %.tex
+TEX = $(shell echo *.tex)
+
+output/%.pdf: %.tex $(TEX)
 	mkdir -p output
 	pdflatex -output-directory=output -shell-escape $<
 	bibtex output/$*
